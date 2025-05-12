@@ -1,0 +1,696 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <cmath>
+#include <ctime>
+#include <map>
+#include <set>
+
+#define file std::ifstream
+#define arr std::vector<short>
+#define matrix std::vector<arr>
+#define hash_table std::unordered_map<short, arr>
+#define h_map std::map<short, arr>
+#define lst std::vector<std::pair<short, short>>
+#define key std::unordered_map<std::string, bool>
+#define key1 std::unordered_map<std::string, std::pair<int, int>>
+#define set_ std::set<arr>
+
+std::ostream& operator<<(std::ostream& os, const arr& v) {
+    for (int i = 0; i < v.size(); ++ i) {
+        os << v[i] << " ";
+    }
+    
+    return os;
+}
+
+
+void read(file& f, matrix& m, hash_table& ht, h_map& hm, lst& single, set_& s, int& clauses, int& literals) {
+    int x, ind = 1, cnt = 0;
+
+    f >> literals >> clauses;
+
+    arr vec(literals + 2, 0);
+    m.push_back(vec);
+
+    while (f >> x) {
+        if (x != 0) {
+            if (x > 0) {
+                vec[x] = 1;
+            } else {
+                vec[-x] = -1;
+            }
+            ++ vec[0];
+            ht[x].push_back(ind);
+        } else {
+            if (vec[0] == 1) {
+                for (int i = 1; i <= literals; ++ i) {
+                    if (vec[i] != 0) {
+                        single.push_back(std::make_pair(ind, i * vec[i]));
+                        break;
+                    }
+                }
+            }
+
+            hm[vec[0]].push_back(ind);
+            m.push_back(vec);
+            s.insert(vec);
+            for (int i = 0; i <= literals; ++ i) {
+                vec[i] = 0;
+            }
+            ++ ind;
+        }
+    }
+}
+
+int DP_type1(hash_table& ht, lst& single) {
+    srand(time(0));
+    return rand() % single.size();
+}
+
+int DP_type2(hash_table& ht, lst& single) {
+    int maxi = 0, ind;
+
+    for (int i = 0; i < single.size(); ++ i) {
+        if (ht[single[i].second].size() > maxi) {
+            maxi = ht[single[i].second].size();
+            ind = i;
+        }
+    }
+
+    return ind;
+}
+
+int DP_type3(hash_table& ht, lst& single) {
+    int maxi = 0, ind;
+
+    for (int i = 0; i < single.size(); ++ i) {
+        if (ht[single[i].second * -1].size() > maxi) {
+            maxi = ht[single[i].second * -1].size();
+            ind = i;
+        }
+    }
+
+    return ind;
+}
+
+int DP_type4(hash_table& ht, lst& single) {
+    int maxi1 = 0, ind1, maxi2 = 0, ind2;
+
+    for (int i = 0; i < single.size(); ++ i) {
+        if (ht[single[i].second].size() > maxi1) {
+            maxi1 = ht[single[i].second].size();
+            ind1 = i;
+        }
+        if (ht[single[i].second * -1].size() > maxi2) {
+            maxi2 = ht[single[i].second * -1].size();
+            ind2 = i;
+        }
+    }
+
+    if (maxi1 > maxi2) {
+        return ind1;
+    }
+    return ind2;
+}
+
+void DP_delete1(matrix& m, hash_table& ht, h_map& hm, int element, int& clauses) {
+    for (const int& item: ht[element]) {
+        if (m[item][0] != 0) {
+            for (int i = 0; i < hm[m[item][0]].size(); ++ i) {
+                if (hm[m[item][0]][i] == item) {
+                    hm[m[item][0]].erase(hm[m[item][0]].begin() + i);
+                    if (hm[m[item][0]].size() == 0) {
+                        hm.erase(m[item][0]);
+                    }
+                    break;
+                }
+            }
+
+            m[item][0] = 0;
+            -- clauses;
+
+            if (clauses == 0) {
+                std::cout << "S-a format multimea vida de clauze. Raspunsul este satisfiabil";
+                exit(0);
+            }
+        }
+    }
+    
+    ht.erase(element);
+}
+
+void DP_type5(hash_table& ht, h_map& hm, matrix& m, int literals, int& clauses) {
+    for (int i = 1; i <= literals; ++ i) {
+        int k1 = 0, k2 = 0;
+        if (ht.find(i) != ht.end()) {
+            for (const int item: ht[i]) {
+                if (m[item][0] != 0) {
+                    k1 = i;
+                    break;
+                }
+            }
+        }
+        if (ht.find(-i) != ht.end()) {
+            for (const int item: ht[-i]) {
+                if (m[item][0] != 0) {
+                    k2 = -i;
+                    break;
+                }
+            }
+        }
+        if (k1 != 0 && k2 == 0) {
+            DP_delete1(m, ht, hm, k1, clauses);
+        } else if (k1 == 0 && k2 != 0) {
+            DP_delete1(m, ht, hm, k2, clauses);
+        }
+    }
+}
+
+void DP_delete(matrix& m, hash_table& ht, h_map& hm, lst& single, int index, int& clauses, int literals, set_& s) {
+    for (const int& item: ht[single[index].second]) {
+        if (m[item][0] != 0) {
+            for (int i = 0; i < hm[m[item][0]].size(); ++ i) {
+                if (hm[m[item][0]][i] == item) {
+                    hm[m[item][0]].erase(hm[m[item][0]].begin() + i);
+                    if (hm[m[item][0]].size() == 0) {
+                        hm.erase(m[item][0]);
+                    }
+                    break;
+                }
+            }
+
+            m[item][0] = 0;
+            -- clauses;
+
+            if (clauses == 0) {
+                std::cout << "S-a format multimea vida de clauze. Raspunsul este satisfiabil";
+                exit(0);
+            }
+        }
+    }
+
+    if (ht.find(single[index].second * -1) != ht.end()) {
+        for (const int& item: ht[single[index].second * -1]) {
+            if (m[item][0] != 0) {
+                m[item][abs(single[index].second)] = 0;
+    
+                for (int i = 0; i < hm[m[item][0]].size(); ++ i) {
+                    if (hm[m[item][0]][i] == item) {
+                        hm[m[item][0]].erase(hm[m[item][0]].begin() + i);
+                        if (hm[m[item][0]].size() == 0) {
+                            hm.erase(m[item][0]);
+                        }
+                        break;
+                    }
+                }
+    
+                -- m[item][0];
+                int aux = ++ m[item][literals + 1];
+                hm[m[item][0]].push_back(item);
+                m[item][literals + 1] = 0;
+                s.insert(m[item]);
+                m[item][literals + 1] = aux;
+    
+                if (m[item][0] == 0) {
+                    std::cout << "S-a format clauza vida. Raspunsul este nesatisfiabil.";
+                    exit(0);
+                } else if (m[item][0] == 1) {
+                    for (int i = 1; i <= literals; ++ i) {
+                        if (m[item][i] != 0) {
+                            single.push_back(std::make_pair(item, i * m[item][i]));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    ht.erase(single[index].second);
+    ht.erase(single[index].second * -1);
+
+    single.erase(single.begin() + index);
+}
+
+bool resolvent(matrix& m, int index1, int index2, int literals) {
+    int k = 0;
+    for (int i = 1; i <= literals; ++ i) {
+        if (m[index1][i] * m[index2][i] == -1) {
+            ++ k;
+            if (k > 1) {
+                return false;
+            }
+        }
+    }
+    return k == 1;
+}
+
+void create_new_clause(matrix& m, hash_table& ht, h_map& hm, int index1, int index2, int& clauses, int literals, lst& single, set_& s, int& k) {
+    arr vec(literals + 2, 0);
+    int cnt = 0, ind = m.size();
+    for (int i = 1; i <= literals; ++ i) {
+        if (m[index1][i] != 0 || m[index2][i] != 0) {
+            if (m[index1][i] * m[index2][i] == -1) {}
+            else if (m[index1][i] != 0) {
+                vec[i] = m[index1][i];
+                ++ cnt;
+            } else if (m[index2][i] != 0) {
+                vec[i] = m[index2][i];
+                ++ cnt;
+            }
+        }
+    }
+
+    vec[0] = cnt;
+    
+    if (s.find(vec) == s.end()) {
+        k = 1;
+        //std::cout << index1 << " " << index2 << "\n";
+
+        for (int i = 1; i <= literals; ++ i) {
+            if (vec[i] == 1) {
+                ht[i].push_back(ind);
+                //std::cout << i << " ";
+            } else if (vec[i] == -1) {
+                ht[-i].push_back(ind);
+                //std::cout << -i << " ";
+            }
+        }
+
+        ++ clauses;
+        hm[cnt].push_back(ind);
+        m.push_back(vec);
+        s.insert(vec);
+
+        if (cnt <= 2) {
+            std::cout << cnt << "\n";
+            for (int i = 1; i <= literals; ++ i) {
+                if (vec[i]) {
+                    std::cout << i * vec[i] << " ";
+                }
+            }
+            std::cout << "\n\n";
+        }
+    
+        if (cnt == 1) {
+            for (int i = 1; i <= literals; ++ i) {
+                if (vec[i] != 0) {
+                    single.push_back(std::make_pair(ind, i * vec[i]));
+                    break;
+                }
+            }
+        } else if (cnt == 0) {
+            std::cout << "S-a format clauza vida. Raspunsul este nesatisfiabil.";
+            exit(0);
+        }
+    }
+}
+
+bool combine(h_map::iterator it1, h_map::iterator it2, matrix& m, hash_table& ht, h_map& hm, int& clauses, int literals, lst& single, key& combined, set_& ss) {
+    if (it1 == it2) {
+        for (int i = 0; i < it1 -> second.size() - 1; ++ i) {
+            for (int j = i + 1; j < it1 -> second.size(); ++ j) {
+                //std::string s = std::to_string(it1 -> second[i]) + "-" + std::to_string(it1 -> second[j]);
+                std::string s = std::to_string(it1 -> second[i]) + "+" + std::to_string(m[it1 -> second[i]][literals + 1]) + "-" +
+                                std::to_string(it1 -> second[j]) + "+" + std::to_string(m[it1 -> second[j]][literals + 1]);
+                if (combined.find(s) == combined.end()) {
+                    if (resolvent(m, it1 -> second[i], it1 -> second[j], literals)) {
+                        int k = 0;
+                        create_new_clause(m, ht, hm, it1 -> second[i], it1 -> second[j], clauses, literals, single, ss, k);
+                        combined[s] = true;
+                        if (k == 0) {
+                            continue;
+                        }
+                        return true;
+                    }
+                }
+                combined[s] = true;
+            }
+        }
+    } else {
+        for (int i = 0 ; i < it1 -> second.size(); ++ i) {
+            for (int j = 0; j < it2 -> second.size(); ++ j) {
+                //std::string s = std::to_string(it1 -> second[i]) + "-" + std::to_string(it2 -> second[j]);
+                std::string s = std::to_string(it1 -> second[i]) + "+" + std::to_string(m[it1 -> second[i]][literals + 1]) + "-" +
+                                std::to_string(it2 -> second[j]) + "+" + std::to_string(m[it2 -> second[j]][literals + 1]);
+                if (combined.find(s) == combined.end()) {
+                    if (resolvent(m, it1 -> second[i], it2 -> second[j], literals)) {
+                        int k = 0;
+                        create_new_clause(m, ht, hm, it1 -> second[i], it2 -> second[j], clauses, literals, single, ss, k = 1);
+                        combined[s] = true;
+                        if (k == 0) {
+                            continue;
+                        }
+                        return true;
+                    }
+                }
+                combined[s] = true;
+            }
+        }
+    }
+    return false;
+}
+
+void DP_resolution(matrix& m, hash_table& ht, h_map& hm, int& clauses, int literals, lst& single, key& combined, set_& s) {
+
+    for (h_map::iterator it = hm.begin(); it != hm.end(); ++ it) {
+        h_map::iterator it1 = it;
+        while (it1 != hm.end()) {
+            if (combine(it, it1, m, ht, hm, clauses, literals, single, combined, s)) {
+                return;
+            }
+            ++ it1;
+        }
+    }
+    std::cout << "Raspunsul este satisfiabil!\n";
+
+    exit(0);
+}
+
+
+
+void DP(matrix& m, hash_table& ht, h_map& hm, lst& single, int& clauses, int literals, int (*fct)(hash_table& ht, lst& single), key& combined, set_& s) {
+    int i = 0, k;
+    while (true) {
+        //std::cout << "\n" << i << "\n";
+        if (single.size() != 0) {
+            int index = fct(ht, single);
+
+            DP_delete(m, ht, hm, single, index, clauses, literals, s);
+
+            k = 1;
+        } else {
+            if (k == 1) {
+                DP_type5(ht, hm, m, literals, clauses);
+
+                k = 0;
+            } else {
+                DP_resolution(m, ht, hm, clauses, literals, single, combined, s);
+            }
+
+            /*const int element = DP_type5(ht);
+            if (element != 0) {
+                DP_delete1(m, ht, hm, element, clauses);
+            } else {
+                DP_resolution(m, ht, hm, clauses, literals, single, combined, s);
+            }*/
+        }
+        ++ i;
+        
+    }
+
+    for (h_map::iterator it = hm.begin(); it != hm.end(); ++ it) {
+        std::cout << it -> first << ":    " << it -> second << "\n\n";
+    }
+}
+
+
+
+int main() {
+
+    file f("input.txt");
+    matrix m;
+    hash_table ht;
+    h_map hm;
+    lst single;
+    key combined;
+    key1 combined1;
+    set_ s;
+    int clauses, literals;
+
+    read(f, m, ht, hm, single, s, clauses, literals);
+
+    /*for (int i = 0; i < m.size(); ++ i) {
+        for (int j = 1; j <= literals; ++ j) {
+            if (m[i][j]) std::cout << j * m[i][j] << " ";
+        }
+        std::cout << "\n";
+    }
+
+    std::cout << combined.size() << "\n\n\n";*/
+
+    DP(m, ht, hm, single, clauses, literals, DP_type2, combined, s);
+
+    /*for (h_map::iterator it = hm.begin(); it != hm.end(); ++ it) {
+        std::cout << it -> first << ":    " << it -> second << "\n";
+    }
+    std::cout << "\n\n";
+    for (hash_table::iterator it = ht.begin(); it != ht.end(); ++ it) {
+        std::cout << it -> first << ":    " << it -> second << "\n";
+    }
+
+    std::cout << "\n\n" << clauses;*/
+
+    return 0;
+}
+
+
+
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <cmath>
+#include <ctime>
+#include <map>
+#include <set>
+
+#define file std::ifstream
+#define arr std::vector<short>
+#define matrix std::vector<arr>
+#define matrix1 std::vector<std::vector<std::pair<short, short>>>
+#define hash_table std::unordered_map<short, arr>
+#define sat std::vector<bool>
+
+std::ostream& operator<< (std::ostream& os, const arr& vec) {
+    for (int i = 0; i < vec.size(); ++ i) {
+        os << vec[i] << " ";
+    }
+    return os;
+}
+
+void read(file& f, hash_table& ht, matrix& m, sat& s, sat& lit, arr& single, int& clauses, int& literals) {
+    f >> literals >> clauses;
+    s.resize(literals + 1);
+    lit.resize(clauses + 1, 0);
+
+    int x, ind = 1;
+    arr vec(literals + 1, 0);
+    m.push_back(vec);
+
+    while (f >> x) {
+        if (x != 0) {
+            if (x > 0) {
+                vec[x] = 1;
+            } else {
+                vec[-x] = -1;
+            }
+            ++ vec[0];
+            ht[x].push_back(ind);
+        } else {
+            if (vec[0] == 1) {
+                for (int i = 1; i <= literals; ++ i) {
+                    if (vec[i] != 0) {
+                        single.push_back(i * vec[i]);
+                        break;
+                    }
+                }
+            }
+
+            m.push_back(vec);
+
+            for (int i = 0; i <= literals; ++ i) {
+                vec[i] = 0;
+            }
+
+            ++ ind;
+        }
+    }
+
+}
+
+matrix1 modify(int el, int& k, hash_table& ht, matrix& m, sat& lit, arr& single, int& clauses, int literals) {
+    matrix1 mm(2);
+
+    for (const int& e: ht[el]) {
+        if (m[e][0] != 0) {
+            mm[0].push_back(std::make_pair(e, m[e][0]));
+            m[e][0] = 0;
+            -- clauses;
+
+            if (clauses == 0) {
+                std::cout << "SATISFIABILA\n";
+                exit(0);
+            }
+        }
+    }
+
+    for (const int& e: ht[-el]) {
+        if (m[e][0] != 0) {
+            mm[1].push_back(std::make_pair(e, m[e][abs(el)]));
+            m[e][abs(el)] = 0;
+            -- m[e][0];
+
+            if (m[e][0] == 0) {
+                k = 1;
+                break;
+            } else if (m[e][0] == 1) {
+                for (int i = 1; i <= literals; ++ i) {
+                    if (m[e][i] != 0) {
+                        single.push_back(i * m[e][i]);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    lit[abs(el)] = 1;
+
+    return mm;
+}
+
+void undo_modify(matrix1& mm, matrix& m, arr& single, int el, int& clauses, sat& lit) {
+    for (int i = 0; i < mm[0].size(); ++ i) {
+        m[mm[0][i].first][0] = mm[0][i].second;
+        ++ clauses;
+    }
+
+    for (int i = 0; i < mm[1].size(); ++ i) {
+        if (m[mm[1][i].first][0] == 1) {
+            single.pop_back();
+        }
+        ++ m[mm[1][i].first][0];
+        m[mm[1][i].first][abs(el)] = mm[1][i].second;
+    }
+
+    lit[abs(el)] = 0;
+}
+
+int pick_lit(sat& lit, int literals) {
+    for (int i = 1; i <= literals; ++ i) {
+        if (lit[i] == 0) {
+            return i;
+        }
+    }
+    return 0;
+}
+
+void DPLL(arr& single, hash_table& ht, matrix& m, sat& lit, int literals, int& clauses) {
+    if (single.size() != 0) {
+        int el = single[single.size() - 1];
+        single.pop_back();
+        
+        int k = 0;
+        matrix1 mm = modify(el, k, ht, m, lit, single, clauses, literals);
+
+        if (k == 1) {
+            undo_modify(mm, m, single, el, clauses, lit);
+        } else {
+            DPLL(single, ht, m, lit, literals, clauses);
+            undo_modify(mm, m, single, el, clauses, lit);
+        }
+
+        single.push_back(el);
+
+    } else {
+        int l = pick_lit(lit, literals);
+        int k = 0;
+
+        for (int i = -1; i <= 1; i += 2) {
+            matrix1 mm = modify(l * i, k, ht, m, lit, single, clauses, literals);
+
+            if (k == 1) {
+                undo_modify(mm, m, single, l * i, clauses, lit);
+            } else {
+                DPLL(single, ht, m, lit, literals, clauses);
+                undo_modify(mm, m, single, l * i, clauses, lit);
+            }
+        }
+    }
+}
+
+int main() {
+    file f("input1.txt");
+    int clauses, literals;
+    matrix m;
+    hash_table ht;
+    sat s, lit;
+    arr single;
+
+    read(f, ht, m, s, lit, single, clauses, literals);
+
+    /*for (int i = 0; i < single.size(); ++ i) {
+        std::cout << single[i] << " ";
+    }
+    std::cout << "\n\n";
+
+    for (int i = 0; i < m.size(); ++ i) {
+        for (int j = 1; j <= literals; ++ j) {
+            if (m[i][j] != 0) {
+                std::cout << j * m[i][j] << " ";
+            }
+        }
+        std::cout << "\n";
+    }
+    std::cout << "\n\n";
+
+    for (hash_table::iterator it = ht.begin(); it != ht.end(); ++ it) {
+        std::cout << it -> first << ":  " << it -> second << "\n";
+    }
+    std::cout << "\n\n";*/
+
+    DPLL(single, ht, m, lit, literals, clauses);
+
+    std::cout << "NESATISFIABILA\n";
+
+    return 0;
+}
+
+/*
+5 5
+1 0
+1 3 5 0
+-1 2 0
+-2 -3 4 0
+-1 0
+
+*/
+
+/*
+set the size for single to be constant
+
+*/
+
+/*
+am urmatorii algoritmi:
+#define lst std::list<short>
+
+
+
+
+
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
